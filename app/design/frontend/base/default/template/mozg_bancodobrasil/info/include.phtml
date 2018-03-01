@@ -1,0 +1,265 @@
+<?php
+/**
+ * Copyright © 2016 Mozg. All rights reserved.
+ * See LICENSE.txt for license details.
+ */
+?>
+
+<?php
+
+/*
+dump(get_class($this));
+dump($this->getData());
+dump($this->getMethod());
+dump($this->getMethod()->getData());
+dump($this->getInfo());
+dump($this->getInfo()->getData());
+dump(get_class_methods(get_class($this)));
+//dump(get_class_methods(get_class($this->getInfo())));
+*/
+
+?>
+
+<?php echo $this->htmlEscape($this->getMethod()->getTitle()) ?><br/>
+
+<?php if ($_info = $this->getInfo()): ?>
+
+    <?php if ($_info->getMozgPspReference() == ''): ?>
+        <?php echo Mage::helper('mozg_bancodobrasil')->__('Payment has not been processed yet.') ?> <br/>
+    <?php else :?>
+
+        <?php
+
+        //
+
+        $order = $this->getMethod()->getInfoInstance()->getOrder();
+
+        $realOrderId = $order->getRealOrderId();
+        $incrementId = $order->getIncrementId();
+
+        $storeId = $this->getMethod()->getInfoInstance()->getOrder()->getStoreId();
+
+        //
+
+        $pspReference = $this->htmlEscape($_info->getMozgPspReference());
+
+        //
+
+        if (Mage::app()->getStore()->isAdmin()){
+
+        $url = Mage::helper('adminhtml')->getUrl('adminhtml/Bancodobrasil/consulta/', array('pspReference' => $pspReference,'incrementId' => $incrementId) );
+
+        //$link = "javascript:openPopupsMozg('$url', 'WinXilinus', 'Link', 'Bancodobrasil', 'cielo');";
+        //echo Mage::helper('mozg_bancodobrasil')->__('Bancodobrasil PSP Reference: <a href="%s">%s</a>', $link, $pspReference) . ' <br/>';
+
+        $link = $url;
+
+        echo Mage::helper('mozg_bancodobrasil')->__('Bancodobrasil PSP Reference: <a href="%s" target="_blank">%s</a>', $link, 'Clique aqui') . ' <br/>';
+
+        }
+
+        //
+
+        ?>
+
+        <?php
+
+        // Sonda
+
+        $incrementId = $pspReference;
+        $order = Mage::getModel('sales/order')->loadByIncrementId($incrementId);
+        $orderCurrencyCode = $order->getOrderCurrencyCode();
+        // override amount because this amount uses the right currency
+        $amount = $order->getGrandTotal();
+        $amount = Mage::helper('mozg_bancodobrasil')->formatAmount($amount,$orderCurrencyCode);
+        $payment = $order->getPayment();
+        $methodInstance = $payment->getMethodInstance();
+
+        /*dump($methodInstance);
+        exit;*/
+
+        //
+
+        $idConv = Mage::helper('mozg_bancodobrasil')->_getConfigData('idConv', 'mozg_bancodobrasil_abstract', $storeId);
+        $refTran = Mage::helper('mozg_bancodobrasil')->_getConfigData('refTran', 'mozg_bancodobrasil_abstract', $storeId);
+
+        $len_cobranca = strlen($refTran);
+        $_pad_length =  (17 - $len_cobranca);
+        $refTran = $refTran . str_pad($incrementId, $_pad_length, "0", STR_PAD_LEFT);
+
+        $url = 'https://www16.bancodobrasil.com.br/site/mpag/REC3.jsp';
+        $request_data = array(
+            'idConv' => $idConv,
+            'refTran' => $refTran,
+            'valorSonda' => $amount,
+            'formato' => '01',
+            );
+
+        $url_get = $url . '?' . http_build_query($request_data);
+
+        $input_form = '';
+        foreach ($request_data as $key => $value) {
+            $input_form .= "<input type=\"hidden\" name=\"$key\" value=\"$value\">";
+        }
+
+        $html = <<<EOF
+        <form action="$url" method="post" target="_blank">
+        $input_form
+        <input type="submit" name="submit" value="Consultar">
+        </form>
+        <br>
+EOF;
+
+        //echo $html;
+
+        $url = $url_get;
+        echo Mage::helper('mozg_bancodobrasil')->__('Bancodobrasil PSP Reference: <a href="%s" target="_blank">%s</a>', $url, $pspReference);
+        echo "<br/>";
+
+        ?>
+
+        <?php
+
+        // Status
+
+
+        $controllerName = Mage::app()->getRequest()->getControllerName();
+        $moduleName = Mage::app()->getRequest()->getModuleName();
+
+        $isValidCheckout = !strcmp ($controllerName, 'onepage') || !strcmp ($moduleName, 'onestepcheckout') ? true : false;
+
+        if (!$isValidCheckout){
+
+            $storeId = null;
+
+            $idConv = Mage::helper('mozg_bancodobrasil')->_getConfigData('idConv', 'mozg_bancodobrasil_abstract', $storeId);
+            $refTran = Mage::helper('mozg_bancodobrasil')->_getConfigData('refTran', 'mozg_bancodobrasil_abstract', $storeId);
+
+            $len_cobranca = strlen($refTran);
+            $_pad_length =  (17 - $len_cobranca);
+            $refTran = $refTran . str_pad($incrementId, $_pad_length, "0", STR_PAD_LEFT);
+
+            try {
+
+                $url = 'https://www16.bancodobrasil.com.br/site/mpag/REC3.jsp';
+                $request_data = array(
+                    'idConv' => $idConv,
+                    'refTran' => $refTran,
+                    'valorSonda' => $amount,
+                    'formato' => '02',
+                    );
+
+                $client = new Zend_Http_Client($url);
+                $client->setParameterPost( $request_data );
+                $result = $client->request('POST')->getBody();
+                $result = preg_replace('/<\![^>]*>/', '', $result); // remove doctype and cdata declarations
+                //dump($result);
+                $result = preg_replace('/<\?[^>]*>/', '', $result); // remove xml version and charset declaration
+                //dump($result);
+                $xml = @simplexml_load_string($result);
+
+                $array_response = array();
+                foreach ($xml->children() as $child) {
+                    $array_response[(string)$child['nome']] = (string) $child['valor'];
+                }
+
+                //dump($array_response);
+
+            } catch (\Exception $e) {
+                dump($e);
+            }
+
+            //
+
+            $tpPagamento = $array_response['tpPagamento'];
+            $tpPagamento = Mage::helper('mozg_bancodobrasil')->__("Method {$tpPagamento}");
+            echo Mage::helper('mozg_bancodobrasil')->__('Method: %s', $tpPagamento);
+            echo "<br/>";
+
+            $situacao = $array_response['situacao'];
+            $color = ($situacao == '00') ? 'green' : 'red';
+            $situacao = Mage::helper('mozg_bancodobrasil')->__("Status {$situacao}");
+            $situacao = '<font color="'.$color.'"><b>' . $situacao . '</b></font>';
+            echo Mage::helper('mozg_bancodobrasil')->__('Situacao: %s', $situacao);
+            echo "<br/>";
+
+        }
+
+        ?>
+
+
+    <?php endif;?>
+
+
+
+
+    <?php if ($this->getInfo()->getMethod() == 'mozg_bancodobrasil_comercioeletronico_bb'): ?>
+        <?php $boleto = unserialize($this->getInfo()->getPoNumber())?>
+        <?php if(!empty($boleto['firstname'])): ?>
+            <?php echo Mage::helper('mozg_bancodobrasil')->__('Social Security Number: %s', $this->htmlEscape($boleto['social_security_number'])) ?><br/>
+            <?php echo Mage::helper('mozg_bancodobrasil')->__('Firstname: %s', $this->htmlEscape($boleto['firstname'])) ?><br/>
+            <?php echo Mage::helper('mozg_bancodobrasil')->__('Lastname: %s', $this->htmlEscape($boleto['lastname'])) ?><br/>
+        <?php endif;?>
+
+        <?php if($this->getInfo()->getOrder() != null): ?>
+            <?php echo Mage::helper('mozg_bancodobrasil')->__('Transaction: <a target="_blank" href="%s">Download</a>', $this->getInfo()->getOrder()->getMozgPaymentUrl()) ?><br/>
+        <?php endif;?>
+
+    <?php endif; ?>
+
+
+
+
+    <?php if ($this->getInfo()->getMethod() == 'mozg_bancodobrasil_comercioeletronico_boleto'): ?>
+        <?php $boleto = unserialize($this->getInfo()->getPoNumber())?>
+        <?php if(!empty($boleto['firstname'])): ?>
+            <?php echo Mage::helper('mozg_bancodobrasil')->__('Social Security Number: %s', $this->htmlEscape($boleto['social_security_number'])) ?><br/>
+            <?php echo Mage::helper('mozg_bancodobrasil')->__('Firstname: %s', $this->htmlEscape($boleto['firstname'])) ?><br/>
+            <?php echo Mage::helper('mozg_bancodobrasil')->__('Lastname: %s', $this->htmlEscape($boleto['lastname'])) ?><br/>
+        <?php endif;?>
+
+        <?php if($this->getInfo()->getOrder() != null): ?>
+            <?php echo Mage::helper('mozg_bancodobrasil')->__('Boleto PDF: <a target="_blank" href="%s">Download</a>', $this->getInfo()->getOrder()->getMozgPaymentUrl()) ?><br/>
+        <?php endif;?>
+
+    <?php endif; ?>
+
+
+
+
+    <?php if ($this->getInfo()->getMethod() == 'mozg_bancodobrasil_comercioeletronico_eletronictransfer'): ?>
+        <?php $boleto = unserialize($this->getInfo()->getPoNumber())?>
+        <?php if(!empty($boleto['firstname'])): ?>
+            <?php echo Mage::helper('mozg_bancodobrasil')->__('Social Security Number: %s', $this->htmlEscape($boleto['social_security_number'])) ?><br/>
+            <?php echo Mage::helper('mozg_bancodobrasil')->__('Firstname: %s', $this->htmlEscape($boleto['firstname'])) ?><br/>
+            <?php echo Mage::helper('mozg_bancodobrasil')->__('Lastname: %s', $this->htmlEscape($boleto['lastname'])) ?><br/>
+        <?php endif;?>
+
+        <?php if($this->getInfo()->getOrder() != null): ?>
+            <?php echo Mage::helper('mozg_bancodobrasil')->__('EletronicTransfer PDF: <a target="_blank" href="%s">Download</a>', $this->getInfo()->getOrder()->getMozgPaymentUrl()) ?><br/>
+        <?php endif;?>
+    <?php endif; ?>
+
+
+    <?php if (Mage::app()->getStore()->isAdmin()): ?>
+        <?php if($this->htmlEscape($this->getInfo()->getMozgAvsResult()) != ""): ?>
+            <?php echo Mage::helper('mozg_bancodobrasil')->__('Avs result: %s', $this->htmlEscape($this->getInfo()->getMozgAvsResult())) ?><br/>
+        <?php endif; ?>
+        <?php if($this->htmlEscape($this->getInfo()->getMozgCvcResult()) != ""): ?>
+            <?php echo Mage::helper('mozg_bancodobrasil')->__('Cvc result: %s', $this->htmlEscape($this->getInfo()->getMozgCvcResult())) ?><br/>
+        <?php endif; ?>
+        <?php if($this->htmlEscape($this->getInfo()->getMozgTotalFraudScore()) != ""): ?>
+            <?php echo Mage::helper('mozg_bancodobrasil')->__('Total fraud score: %s', $this->htmlEscape($this->getInfo()->getMozgTotalFraudScore())) ?><br/>
+        <?php endif; ?>
+        <?php if($this->htmlEscape($this->getInfo()->getMozgRefusalReasonRaw()) != ""): ?>
+            <?php echo Mage::helper('mozg_bancodobrasil')->__('Raw acquirer response: %s', $this->htmlEscape($this->getInfo()->getMozgRefusalReasonRaw())) ?><br/>
+        <?php endif; ?>
+        <?php if($this->htmlEscape($this->getInfo()->getMozgAuthCode()) != ""): ?>
+            <?php echo Mage::helper('mozg_bancodobrasil')->__('Authorisation code: %s', $this->htmlEscape($this->getInfo()->getMozgAuthCode())) ?><br/>
+        <?php endif; ?>
+        <?php if($this->htmlEscape($this->getInfo()->getMozgAcquirerReference()) != ""): ?>
+            <?php echo Mage::helper('mozg_bancodobrasil')->__('Acquirer reference: %s', $this->htmlEscape($this->getInfo()->getMozgAcquirerReference())) ?><br/>
+        <?php endif; ?>
+    <?php endif; ?>
+
+<?php endif;?>
