@@ -1,0 +1,12 @@
+## Modman Module Mozg
+app/code/local/Mozg/Bancodobrasil/	app/code/local/Mozg/Bancodobrasil/
+app/design/adminhtml/default/default/layout/mozg_bancodobrasil.xml	app/design/adminhtml/default/default/layout/mozg_bancodobrasil.xml
+app/design/adminhtml/default/default/template/mozg_bancodobrasil/	app/design/adminhtml/default/default/template/mozg_bancodobrasil/
+app/design/frontend/base/default/layout/mozg_bancodobrasil.xml	app/design/frontend/base/default/layout/mozg_bancodobrasil.xml
+app/design/frontend/base/default/template/mozg_bancodobrasil/	app/design/frontend/base/default/template/mozg_bancodobrasil/
+app/etc/modules/Mozg_Bancodobrasil.xml	app/etc/modules/Mozg_Bancodobrasil.xml
+app/locale/pt_BR/Mozg_Bancodobrasil.csv	app/locale/pt_BR/Mozg_Bancodobrasil.csv
+js/mozg_bancodobrasil/	js/mozg_bancodobrasil/
+skin/adminhtml/default/default/images/mozg_bancodobrasil/	skin/adminhtml/default/default/images/mozg_bancodobrasil/
+skin/frontend/base/default/css/mozg_bancodobrasil/	skin/frontend/base/default/css/mozg_bancodobrasil/
+skin/frontend/base/default/images/mozg_bancodobrasil/	skin/frontend/base/default/images/mozg_bancodobrasil/

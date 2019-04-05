@@ -1,0 +1,67 @@
+<?php
+/**
+ * Copyright © 2016 Mozg. All rights reserved.
+ * See LICENSE.txt for license details.
+ */
+
+//dump('123');
+
+/*dump($this->getData());
+dump(get_class_methods(get_class($this)));
+dump(get_class_vars(get_class($this)));*/
+
+?>
+
+<!-- <?php echo get_class($this) ?> -->
+
+<script type="text/javascript">
+console.log('<?php echo get_class($this) ?>');
+</script>
+
+<?php if ($this->isCurrentMethod()): ?>
+
+    <div class="bancodobrasil-checkout-onepage-success">
+
+        <?php //if ($this->isBoletoPayment() || $this->isEletronicTransferPayment()): ?>
+            <div class="payment-url">
+
+                <?php
+
+                $format = 'javascript:openPopupsMozg(\'%s\', \'Popup\', \'Link\', \'Bancodobrasil\', \'bancodobrasil\');';
+                //$format = 'javascript:window.open(\'%s\');';
+                $args_1 = $this->getPaymentUrl();
+                $link = sprintf($format, $args_1);
+
+                $format = '<button id="bancodobrasil_transaction" type="submit" class="button" onclick="%s"><span><span>%s</span></span></button>';
+                $args_1 = $link;
+                $args_2 = Mage::helper('mozg_bancodobrasil')->__('Click here to process transaction');
+                $button = sprintf($format, $args_1, $args_2);
+
+                echo $button . ' <br/>';
+
+                ?>
+            </div>
+
+            <script type="text/javascript">
+
+            Event.observe (window, "load", function (event){
+                console.log('load');
+                console.log(event);
+                var target= 'target' in event ? event.target : event.srcElement;
+                console.log('clicked on '+target.tagName);
+
+                if($('bancodobrasil_transaction')){
+                    window.location.href = "#bancodobrasil_transaction";
+                    $('bancodobrasil_transaction').click();
+                }
+
+            });
+
+            </script>
+        <?php //endif; ?>
+
+    </div>
+
+<?php endif; ?>
+
+<!-- / <?php echo get_class($this) ?> -->
